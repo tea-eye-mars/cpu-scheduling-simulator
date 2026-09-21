@@ -30,6 +30,7 @@ def run_scaling_experiment():
 
     return process_counts, results
 
+import os # Add this at the top of your file
 
 def generate_report_plots(process_counts, results):
     """Generates graphs and exports plot image for report inclusion."""
