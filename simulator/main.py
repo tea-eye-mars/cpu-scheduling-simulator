@@ -1,3 +1,5 @@
+import csv
+import os
 import random
 import matplotlib.pyplot as plt
 
@@ -30,8 +32,6 @@ def run_scaling_experiment():
 
     return process_counts, results
 
-import os # Add this at the top of your file
-
 def generate_report_plots(process_counts, results):
     """Generates graphs and exports plot image for report inclusion."""
     metrics = [
@@ -63,6 +63,38 @@ def generate_report_plots(process_counts, results):
     print("\n[SUCCESS] Figures saved to 'report/scheduling_report_results.png'")
     plt.show()
 
+def export_to_csv(process_counts, results):
+    """Exports simulation results to a CSV file for the report appendix."""
+    os.makedirs("report", exist_ok=True)
+    filename = "report/simulation_data.csv"
+
+    with open(filename, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        # Write Header
+        writer.writerow([
+            "Processes",
+            "Algorithm",
+            "Avg_Waiting_Time",
+            "Avg_Turnaround_Time",
+            "Avg_Response_Time",
+            "CPU_Utilization_%",
+            "Throughput",
+        ])
+
+        # Write Data
+        for idx, n in enumerate(process_counts):
+            for alg in ["FCFS", "SRTF", "RR"]:
+                m = results[alg][idx]
+                writer.writerow([
+                    n,
+                    alg,
+                    f"{m['avg_wt']:.2f}",
+                    f"{m['avg_tat']:.2f}",
+                    f"{m['avg_rt']:.2f}",
+                    f"{m['cpu_util']:.2f}",
+                    f"{m['throughput']:.4f}",
+                ])
+    print(f"[SUCCESS] Data exported to '{filename}'")
 
 if __name__ == "__main__":
     counts, metrics_results = run_scaling_experiment()
@@ -78,3 +110,4 @@ if __name__ == "__main__":
             )
 
     generate_report_plots(counts, metrics_results)
+    export_to_csv(counts, metrics_results)
