@@ -7,6 +7,9 @@ from process import generate_workload
 from algorithms import simulate_fcfs, simulate_srtf, simulate_rr
 from metrics import compute_metrics
 
+# ==========================================
+# 1. REPORT GENERATION FUNCTIONS
+# ==========================================
 
 def run_scaling_experiment():
     """Runs simulation for process counts N = 10, 20, 30, 40, 50."""
@@ -34,6 +37,8 @@ def run_scaling_experiment():
 
 def generate_report_plots(process_counts, results):
     """Generates graphs and exports plot image for report inclusion."""
+    os.makedirs("report", exist_ok=True) # Added to prevent crash if run before CSV export
+    
     metrics = [
         ("avg_wt", "Average Waiting Time (units)", "Waiting Time Comparison"),
         ("avg_tat", "Average Turnaround Time (units)", "Turnaround Time Comparison"),
@@ -70,44 +75,113 @@ def export_to_csv(process_counts, results):
 
     with open(filename, mode="w", newline="") as file:
         writer = csv.writer(file)
-        # Write Header
         writer.writerow([
-            "Processes",
-            "Algorithm",
-            "Avg_Waiting_Time",
-            "Avg_Turnaround_Time",
-            "Avg_Response_Time",
-            "CPU_Utilization_%",
-            "Throughput",
+            "Processes", "Algorithm", "Avg_Waiting_Time", "Avg_Turnaround_Time", 
+            "Avg_Response_Time", "CPU_Utilization_%", "Throughput",
         ])
 
-        # Write Data
         for idx, n in enumerate(process_counts):
             for alg in ["FCFS", "SRTF", "RR"]:
                 m = results[alg][idx]
                 writer.writerow([
-                    n,
-                    alg,
-                    f"{m['avg_wt']:.2f}",
-                    f"{m['avg_tat']:.2f}",
-                    f"{m['avg_rt']:.2f}",
-                    f"{m['cpu_util']:.2f}",
-                    f"{m['throughput']:.4f}",
+                    n, alg, 
+                    f"{m['avg_wt']:.2f}", f"{m['avg_tat']:.2f}", f"{m['avg_rt']:.2f}", 
+                    f"{m['cpu_util']:.2f}", f"{m['throughput']:.4f}"
                 ])
     print(f"[SUCCESS] Data exported to '{filename}'")
 
+
+# ==========================================
+# 2. INTERACTIVE SIMULATOR FUNCTIONS
+# ==========================================
+
+def print_gantt_chart(gantt_chart):
+    """Prints a simple text-based Gantt chart to the console."""
+    print("\n--- CPU EXECUTION TIMELINE (GANTT CHART) ---")
+    chart_str = "| "
+    for pid, start, end in gantt_chart:
+        chart_str += f"P{pid} ({start}-{end}) | "
+    print(chart_str)
+    print("--------------------------------------------\n")
+
+def run_interactive_simulation():
+    """Allows the user to select a specific algorithm and process load."""
+    print("\n--- SINGLE RUN SIMULATION ---")
+    print("Select Algorithm:")
+    print("1. First-Come, First-Served (FCFS)")
+    print("2. Shortest Remaining Time First (SRTF)")
+    print("3. Round Robin (RR)")
+    
+    algo_choice = input("Enter choice (1-3): ").strip()
+    algo_map = {'1': 'FCFS', '2': 'SRTF', '3': 'RR'}
+    
+    if algo_choice not in algo_map:
+        print("Invalid choice. Please enter 1, 2, or 3.")
+        return
+
+    try:
+        num_processes = int(input("Enter number of processes (e.g., 10, 20, 50): ").strip())
+        if num_processes <= 0:
+            print("Please enter a positive number.")
+            return
+    except ValueError:
+        print("Invalid input. Please enter a number.")
+        return
+
+    workload = generate_workload(num_processes)
+    algo_name = algo_map[algo_choice]
+    
+    print(f"\n[Running {algo_name} for {num_processes} processes...]")
+
+    if algo_name == 'FCFS':
+        procs, total_t, busy_t, gantt = simulate_fcfs(workload)
+    elif algo_name == 'SRTF':
+        procs, total_t, busy_t, gantt = simulate_srtf(workload)
+    else:
+        procs, total_t, busy_t, gantt = simulate_rr(workload)
+
+    metrics = compute_metrics(procs, total_t, busy_t)
+    
+    print(f"\n=== RESULTS FOR {algo_name} (N={num_processes}) ===")
+    print(f"Average Waiting Time    : {metrics['avg_wt']:.2f} units")
+    print(f"Average Turnaround Time : {metrics['avg_tat']:.2f} units")
+    print(f"Average Response Time   : {metrics['avg_rt']:.2f} units")
+    print(f"CPU Utilization         : {metrics['cpu_util']:.2f}%")
+    print(f"Throughput              : {metrics['throughput']:.4f} processes/unit")
+    
+    print_gantt_chart(gantt)
+
+
+# ==========================================
+# 3. MAIN MENU LOOP
+# ==========================================
+
+def main_menu():
+    """The main interactive loop for the simulator."""
+    while True:
+        print("\n" + "="*45)
+        print("   CPU SCHEDULING SIMULATOR (A/V SYSTEM)")
+        print("="*45)
+        print("1. Run Single Simulation (Choose Algo & Load)")
+        print("2. Run Full Report Experiment (N=10 to 50)")
+        print("3. Exit")
+        print("="*45)
+        
+        choice = input("Select an option (1-3): ").strip()
+        
+        if choice == '1':
+            run_interactive_simulation()
+        elif choice == '2':
+            print("\n[INITIATING FULL SCALING EXPERIMENT (N=10 to 50)]")
+            counts, metrics_results = run_scaling_experiment()
+            generate_report_plots(counts, metrics_results)
+            export_to_csv(counts, metrics_results)
+            print("[DONE] Check the 'report/' folder for your output files.\n")
+        elif choice == '3':
+            print("Exiting simulator. Goodbye!")
+            break
+        else:
+            print("Invalid input. Please select 1, 2, or 3.")
+
 if __name__ == "__main__":
-    counts, metrics_results = run_scaling_experiment()
-
-    print("=== CPU SCHEDULING SIMULATION RESULTS SUMMARY ===")
-    for idx, n in enumerate(counts):
-        print(f"\n--- Process Count: {n} ---")
-        for alg in ["FCFS", "SRTF", "RR"]:
-            m = metrics_results[alg][idx]
-            print(
-                f"{alg:5s} | WT: {m['avg_wt']:.2f} | TAT: {m['avg_tat']:.2f} | "
-                f"RT: {m['avg_rt']:.2f} | Util: {m['cpu_util']:.1f}% | TP: {m['throughput']:.3f}"
-            )
-
-    generate_report_plots(counts, metrics_results)
-    export_to_csv(counts, metrics_results)
+    main_menu()
